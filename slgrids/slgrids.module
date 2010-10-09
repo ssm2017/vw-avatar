@@ -1,0 +1,251 @@
+<?php
+
+define('SLUSER_MACHINE_NAME', variable_get('sluser_global_settings_terminology_sluser_machine_name',  'sluser'));
+define('SLUSER_HUMAN_NAME',variable_get('sluser_global_settings_terminology_sluser_human_name',  'sluser'));
+
+function slgrids_views_api() {
+  return array('api' => 2.0);
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function slgrids_menu() {
+  $items['grid/autocomplete'] = array(
+    'title'     => t('grid autocomplete'),
+    'page callback'  => 'slgrids_autocomplete',
+    'access callback' => TRUE,
+    'type'      => MENU_CALLBACK
+  );
+  return $items;
+}
+
+/**
+ * Explain how the module demonstrates a new node type.slgrids.test
+ */
+function slgrids_info() {
+	return t('SlUser MultiGrid defines a new node type, "Grid", which can be created at !link.', array('!link' => l(t('node/add/grid'), 'node/add/grid')));
+}
+/**
+ * Implementation of hook_node_info().
+ */
+function slgrids_node_info() {
+  return array(
+    'grid' => array(
+      'name'        => t('Grid'),
+      'module'      => 'slgrids',
+      'description' => t("A grid to link to an avatar."),
+      'has_title'   => TRUE,
+      'title_label' => t('Name'),
+      'has_body'    => TRUE,
+      'body_label'  => t('Description'),
+      'locked'      => TRUE
+    )
+  );
+}
+
+/**
+ * Implementation of hook_access().
+ */
+function slgrids_access($op, $node, $account) {
+  if ($op == 'create') {
+    return user_access('create grid content', $account);
+  }
+
+  if ($op == 'update') {
+    if (user_access('edit any grid content', $account) || (user_access('edit own grid content', $account) && ($account->uid == $node->uid))) {
+      return TRUE;
+    }
+  }
+
+  if ($op == 'delete') {
+    if (user_access('delete any grid content', $account) || (user_access('delete own grid content', $account) && ($account->uid == $node->uid))) {
+      return TRUE;
+    }
+  }
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function slgrids_perm() {
+  return array(
+    'create grid content',
+    'delete own grid content',
+    'delete any grid content',
+    'edit own grid content',
+    'edit any grid content',
+  );
+}
+
+/**
+ * Implementation of hook_form().
+ */
+function slgrids_form(&$node, $form_state) {
+
+  $type = node_get_types('type', $node);
+
+  if ($type->has_title) {
+    $form['title'] = array(
+      '#type'           => 'textfield',
+      '#title'          => check_plain($type->title_label),
+      '#required'       => TRUE,
+      '#default_value'  => $node->title,
+      '#weight'         => -5
+    );
+  }
+
+  $form['login_uri'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('Login URI'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->login_uri) ? $node->login_uri : '',
+    '#weight'         => -4
+  );
+  $form['xmlrpc_url'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('XML-rpc URL'),
+    '#default_value'  => isset($node->xmlrpc_url) ? $node->xmlrpc_url : '',
+    '#weight'         => -3
+  );
+  $form['httpIn_url'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('Http-in URL'),
+    '#default_value'  => isset($node->httpIn_url) ? $node->httpIn_url : '',
+    '#weight'         => -3
+  );
+
+  if ($type->has_body) {
+    $form['body_field'] = node_body_field($node, $type->body_label, $type->min_word_count);
+  }
+  return $form;
+}
+
+/**
+ * Implementation of hook_validate().
+ */
+function slgrids_validate($node, &$form) {
+  if (empty($node->login_uri)) {
+    form_set_error('login_uri', t('Login URI can not stay empty.'));
+  }
+}
+
+/**
+ * Implementation of hook_insert().
+ */
+function slgrids_insert($node) {
+  db_query("INSERT INTO {sluser_grids} (vid, nid, login_uri, xmlrpc_url, httpIn_url) VALUES (%d, %d, '%s', '%s', '%s')", $node->vid, $node->nid, $node->login_uri, $node->xmlrpc_url, $node->httpIn_url);
+}
+
+/**
+ * Implementation of hook_update().
+ */
+function slgrids_update($node) {
+  if ($node->revision) {
+    slgrids_insert($node);
+  }
+  else {
+    db_query("UPDATE {sluser_grids} SET login_uri = '%s', xmlrpc_url = '%s', httpIn_url = '%s' WHERE vid = %d", $node->login_uri, $node->xmlrpc_url, $node->httpIn_url, $node->vid);
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function slgrids_nodeapi(&$node, $op, $teaser, $page) {
+  switch ($op) {
+    case 'delete revision':
+      db_query('DELETE FROM {sluser_grids} WHERE vid = %d', $node->vid);
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_delete().
+ */
+function slgrids_delete($node) {
+  // Notice that we're matching all revision, by using the node's nid.
+  db_query('DELETE FROM {sluser_grids} WHERE nid = %d', $node->nid);
+}
+
+/**
+ * Implementation of hook_load().
+ */
+function slgrids_load($node) {
+  $additions = db_fetch_object(db_query('SELECT login_uri, xmlrpc_url, httpIn_url FROM {sluser_grids} WHERE vid = %d', $node->vid));
+  return $additions;
+}
+
+
+/**
+ * Load grid by login_uri.
+ */
+function slgrids_get_by_login_uri($login_uri) {
+  $additions = db_fetch_object(db_query("SELECT nid FROM {sluser_grids} WHERE login_uri = '%s'", $login_uri));
+  return $additions;
+}
+
+
+/**
+ * Implementation of hook_view().
+ */
+function slgrids_view($node, $teaser = FALSE, $page = FALSE) {
+  $node = node_prepare($node, $teaser);
+  // define the theme to use
+  $theme = 'slgrids_node_page';
+  if ($teaser) {
+    $theme = 'slgrids_node_teaser';
+  }
+
+  $node->content['myfield'] = array(
+    '#value' => theme($theme, $node),
+    '#weight' => 1,
+  );
+
+  return $node;
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function slgrids_theme() {
+  return array(
+    'slgrids_node_page' => array(
+      'path'      => drupal_get_path('module', 'slgrids').'/theme',
+      'template'  => 'slgrids_node_page',
+      'arguments' => array('node' => new stdClass),
+    ),
+    'slgrids_node_teaser' => array(
+      'path'      => drupal_get_path('module', 'slgrids').'/theme',
+      'template'  => 'slgrids_node_teaser',
+      'arguments' => array('node' => new stdClass),
+    ),
+  );
+}
+
+/**
+ * A custom theme function.
+ */
+function theme_slgrids_grid_info($node) {
+  $output = '<div class="slgrids_grid_info">';
+  $output .= '<ul>';
+  $output .= '<li>'. t('Login URI'). ' : '. $node->login_uri. '</li>';
+  $output .= '<li>'. t('XML-rpc URL'). ' : '. $node->xmlrpc_url. '</li>';
+  $output .= '<li>'. t('HTTP-in URL'). ' : '. $node->httpIn_url. '</li>';
+  $output .= '</ul>';
+  $output .= '</div>';
+  return $output;
+}
+
+/**
+ * Add an autocomplete function
+ */
+function slgrids_autocomplete($string) {
+  $matches = array();
+  $result = db_query_range("SELECT nid, title FROM {node} WHERE type='grid' AND LOWER(title) LIKE LOWER('%s%%')", $string, 0, 10);
+  while ($grid = db_fetch_object($result)) {
+    $matches[$grid->nid] = check_plain($grid->title);
+  }
+  print drupal_to_js($matches);
+  exit();
+}

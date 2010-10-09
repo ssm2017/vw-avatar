@@ -1,0 +1,8 @@
+; $Id: sluser.info,v 1.14 2010/06/08 20:24:46 ssm2017binder Exp $
+name = SlUser
+description = Map user to SecondLife profile.
+dependencies[] = secondlife
+dependencies[] = slgrids
+dependencies[] = slterminals
+package = SlUser
+core = "6.x"

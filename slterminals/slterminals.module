@@ -1,0 +1,386 @@
+<?php
+
+define('SLUSER_MACHINE_NAME', variable_get('sluser_global_settings_terminology_sluser_machine_name',  'sluser'));
+define('SLUSER_HUMAN_NAME',variable_get('sluser_global_settings_terminology_sluser_human_name',  'sluser'));
+
+/**
+ * Manage the in-wolrd requests.
+ */
+function slterminals_dispatch($cmd, &$sl, $args) {
+  module_load_include("inc", "slterminals", "slterminals.inworld");
+  slterminals_inworld_controller($cmd, $sl, $args);
+}
+
+function slterminals_views_api() {
+  return array('api' => 2.0);
+}
+
+/**
+ * Explain how the module demonstrates a new node type.slterminals.test
+ */
+function slterminals_info() {
+  return t('SlUser Terminals defines a new node type, "Terminal", which can be created at !link.', array('!link' => l(t('node/add/terminal'), 'node/add/terminal')));
+}
+
+function slterminals_menu() {
+  $machine_name = variable_get('sluser_global_settings_terminology_sluser_machine_name',  'sluser');
+  $human_name   = variable_get('sluser_global_settings_terminology_sluser_human_name',  'sluser');
+
+  $items['admin/settings/secondlife/slterminals'] = array(
+    'title'             => t('SlTerminals'),
+    'description'       => t('Settings for the SlTerminals module.'),
+    'page callback'     => 'drupal_get_form',
+    'page arguments'    => array('slterminals_global_settings_form'),
+    'access arguments'  => array('administer site configuration'),
+    'file'              => 'slterminals.admin.inc',
+    'type'              => MENU_LOCAL_TASK
+  );
+  $name = $machine_name. '/terminals/checkstatus/js';
+  $items[$name] = array(
+    'title'             => 'Javascript AHAH check terminal status',
+    'page callback'     => 'slterminals_check_status_js',
+    'access callback'   => TRUE,
+    'type'              => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Implementation of hook_node_info().
+ */
+function slterminals_node_info() {
+  return array(
+    'terminal' => array(
+      'name'        => t('Terminal'),
+      'module'      => 'slterminals',
+      'description' => t("A terminal to link to a grid."),
+      'has_title'   => TRUE,
+      'title_label' => t('Name'),
+      'has_body'    => TRUE,
+      'body_label'  => t('Description'),
+      'locked'      => TRUE
+    )
+  );
+}
+
+/**
+ * Implementation of hook_access().
+ */
+function slterminals_access($op, $node, $account) {
+  if ($op == 'create') {
+    return user_access('create terminal content', $account);
+  }
+
+  if ($op == 'update') {
+    if (user_access('edit any terminal content', $account) || (user_access('edit own terminal content', $account) && ($account->uid == $node->uid))) {
+      return TRUE;
+    }
+  }
+
+  if ($op == 'delete') {
+    if (user_access('delete any terminal content', $account) || (user_access('delete own terminal content', $account) && ($account->uid == $node->uid))) {
+      return TRUE;
+    }
+  }
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function slterminals_perm() {
+  return array(
+    'create terminal content',
+    'delete own terminal content',
+    'delete any terminal content',
+    'edit own terminal content',
+    'edit any terminal content',
+  );
+}
+
+/**
+ * Implementation of hook_form().
+ */
+function slterminals_form(&$node, $form_state) {
+
+  // check if there are some grids
+  $grids = db_result(db_query("SELECT COUNT(*) FROM {node} WHERE type='grid'"));
+  if (!$grids) {
+    drupal_set_message(t("You need to create a grid before creating a terminal."), 'error');
+    drupal_goto('node/add/grid');
+    return;
+  }
+  $type = node_get_types('type', $node);
+
+  if ($type->has_title) {
+    $form['title'] = array(
+      '#type'           => 'textfield',
+      '#title'          => check_plain($type->title_label),
+      '#required'       => TRUE,
+      '#default_value'  => $node->title,
+      '#weight'         => -5
+    );
+  }
+
+  $form['sim_hostname'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('Sim hostname'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->sim_hostname) ? $node->sim_hostname : '',
+    '#weight'         => -4
+  );
+  // get the grids list
+  $grids = array();
+  $result = db_query("SELECT nid, title FROM {node} WHERE type='grid'");
+  while ($grid = db_fetch_object($result)) {
+    $grids[$grid->nid] = $grid->title;
+  }
+  $form['grid_nid'] = array(
+    '#type'           => 'select',
+    '#title'          => t('Grid'),
+    '#required'       => TRUE,
+    '#options'        => $grids,
+    '#default_value'  => isset($node->grid_nid) ? $node->grid_nid : array(),
+    '#weight'         => -4
+  );
+  $form['object_name'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('Object name'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->object_name) ? $node->object_name : '',
+    '#weight'         => -4
+  );
+  $form['object_uuid'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('uuid'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->object_uuid) ? $node->object_uuid : '',
+    '#weight'         => -4
+  );
+  $form['region'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('Region'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->region) ? $node->region : '',
+    '#weight'         => -4
+  );
+  $form['position'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('position'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->position) ? $node->position : '',
+    '#weight'         => -4
+  );
+  $form['rpc_channel'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('rpc_channel'),
+    '#default_value'  => isset($node->rpc_channel) ? $node->rpc_channel : '',
+    '#weight'         => -3
+  );
+  $form['http_url'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('http_url'),
+    '#default_value'  => isset($node->http_url) ? $node->http_url : '',
+    '#weight'         => -3
+  );
+  $form['owner_uuid'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('Owner uuid'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->owner_uuid) ? $node->owner_uuid : '',
+    '#weight'         => -3
+  );
+  $form['owner_name'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('Owner name'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->owner_name) ? $node->owner_name : '',
+    '#weight'         => -3
+  );
+
+  if ($type->has_body) {
+    $form['body_field'] = node_body_field($node, $type->body_label, $type->min_word_count);
+  }
+  return $form;
+}
+
+/**
+ * Implementation of hook_insert().
+ */
+function slterminals_insert($node) {
+  db_query("INSERT INTO {sluser_terminals} ("
+          . " vid," // 1
+          . " nid," // 2
+          . " grid_nid," // 3
+          . " sim_hostname," // 4
+          . " object_name," // 5
+          . " object_uuid," // 6
+          . " region," // 7
+          . " position," // 8
+          . " rpc_channel," // 9
+          . " http_url," // 10
+          . " owner_uuid," // 11
+          . " owner_name" // 12
+          . ") VALUES ("
+          . " %d," // 1
+          . " %d," // 2
+          . " %d," // 3
+          . " '%s'," // 4
+          . " '%s'," // 5
+          . " '%s'," // 6
+          . " '%s'," // 7
+          . " '%s'," // 8
+          . " '%s'," // 9
+          . " '%s'," // 10
+          . " '%s'," // 11
+          . " '%s'" // 12
+          . ")", $node->vid, $node->nid, $node->grid_nid, $node->sim_hostname, $node->object_name, $node->object_uuid, $node->region, $node->position, $node->rpc_channel, $node->http_url, $node->owner_uuid, $node->owner_name);
+}
+
+/**
+ * Implementation of hook_update().
+ */
+function slterminals_update($node) {
+  if ($node->revision) {
+    slterminals_insert($node);
+  }
+  else {
+    db_query("UPDATE {sluser_terminals} SET"
+            . " grid_nid = %d,"
+            . " sim_hostname = '%s',"
+            . " object_name = '%s',"
+            . " object_uuid = '%s',"
+            . " region = '%s',"
+            . " position = '%s',"
+            . " rpc_channel = '%s',"
+            . " http_url = '%s',"
+            . " owner_uuid = '%s',"
+            . " owner_name = '%s'"
+            . " WHERE vid = %d", $node->grid_nid, $node->sim_hostname, $node->object_name, $node->object_uuid, $node->region, $node->position, $node->rpc_channel, $node->http_url, $node->owner_uuid, $node->owner_name, $node->vid);
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function slterminals_nodeapi(&$node, $op, $teaser, $page) {
+  switch ($op) {
+    case 'delete revision':
+      db_query('DELETE FROM {sluser_terminals} WHERE vid = %d', $node->vid);
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_delete().
+ */
+function slterminals_delete($node) {
+  // Notice that we're matching all revision, by using the node's nid.
+  db_query('DELETE FROM {sluser_terminals} WHERE nid = %d', $node->nid);
+}
+
+/**
+ * Implementation of hook_load().
+ */
+function slterminals_load($node) {
+  $additions = db_fetch_object(db_query('SELECT grid_nid, sim_hostname, object_name, object_uuid, region, position, rpc_channel, http_url, owner_uuid, owner_name FROM {sluser_terminals} WHERE vid = %d', $node->vid));
+  return $additions;
+}
+
+/**
+ * Implementation of hook_view().
+ */
+function slterminals_view($node, $teaser = FALSE, $page = FALSE) {
+  global $base_url;
+  $node = node_prepare($node, $teaser);
+
+  // add the ajax online test
+  $machine_name = variable_get('sluser_global_settings_terminology_sluser_machine_name',  'sluser');
+  $path = $base_url. '/'. $machine_name. '/terminals/checkstatus/js';
+  drupal_add_js('$(document).ready(function(){$.get(\''. $path. '\', {nid:'. $node->nid. '}, function(data) {$(\'#terminal-'. $node->nid. '-status\').html(data);});})', 'inline');
+
+  // define the theme to use
+  $theme = 'slterminals_node_page';
+  if ($teaser) {
+    $theme = 'slterminals_node_teaser';
+  }
+
+  $node->content['myfield'] = array(
+    '#value' => theme($theme, $node),
+    '#weight' => 1,
+  );
+
+  return $node;
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function slterminals_theme() {
+  return array(
+    'slterminals_node_page' => array(
+      'path'      => drupal_get_path('module', 'slterminals').'/theme',
+      'template'  => 'slterminals_node_page',
+      'arguments' => array('node' => new stdClass),
+    ),
+    'slterminals_node_teaser' => array(
+      'path'      => drupal_get_path('module', 'slterminals').'/theme',
+      'template'  => 'slterminals_node_teaser',
+      'arguments' => array('node' => new stdClass),
+    ),
+  );
+}
+
+/**
+ * Check password
+ */
+function slterminals_check_password($password, $key) {
+  if ($password == md5(variable_get('slterminals_global_settings_terminals_password', "0000").':'.$key)) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+
+/**
+ * Check the terminal status
+ */
+function slterminals_check_status_js() {
+  $terminal_id = $_GET['nid'];
+  $status = "offline";
+
+  // get the terminal
+  $terminal = node_load($terminal_id);
+
+  $http_answer = new stdclass;
+  if ($terminal->http_url != '') {
+    // request status using http_request
+    $http_answer = drupal_http_request(base64_decode($terminal->http_url). '/get_status/', array(), 'GET');
+  }
+  else {
+    $http_answer->code = 404;
+  }
+  
+  if ($http_answer->code == 200) {
+    $status = $http_answer->data;
+  }
+  else {
+    // request status using xmlrpc
+    $answer = secondlife_rpc ($terminal->rpc_channel, GET_STATUS, "check status");
+    $status = $answer['string'];
+  }
+
+  switch ($status) {
+    case 'online':
+      print '<span style="font-weight:bold;color:green">'. t('Online'). '</span>';
+      break;
+
+    case 'disabled':
+      print '<span style="font-weight:bold;color:orange">'. t('Disabled'). '</span>';
+      break;
+
+    case 'offline':
+    default:
+      print '<span style="font-weight:bold;color:red">'. t('Offline'). '</span>';
+      break;
+  }
+}

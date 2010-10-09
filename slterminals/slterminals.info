@@ -1,0 +1,6 @@
+; $Id: sluser.info,v 1.14 2010/06/08 20:24:46 ssm2017binder Exp $
+name = slterminals
+description = Map user to SecondLife or OpenSim profile.
+dependencies[] = secondlife
+package = SlUser
+core = "6.x"

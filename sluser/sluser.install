@@ -1,0 +1,65 @@
+<?php
+// $Id: sluser.install,v 1.4 2009/10/05 19:21:41 ssm2017binder Exp $
+/**
+ * @package	SlUser
+ * @copyright	Copyright (C) 2009 Wene / ssm2017 Binder (S.Massiaux). All rights reserved.
+ * @license		GNU/GPL, http://www.gnu.org/licenses/gpl-2.0.html
+ * SlUser is free software. This version may have been modified pursuant to the GNU General Public License,
+ * and as distributed it includes or is derivative of works licensed under the GNU General Public License
+ * or other free or open source software licenses.
+ */
+
+/**
+  * Implementation of hook_install().
+  */
+function sluser_install() {
+  // Create tables.
+  drupal_install_schema('sluser');
+}
+
+/**
+  * Implementation of hook_uninstall().
+  */
+function sluser_uninstall() {
+  // Remove tables.
+  drupal_uninstall_schema('sluser');
+  // Remove variables.
+  db_query("DELETE FROM {variable} WHERE name LIKE 'sluser%%'");
+}
+
+/**
+  * Implementation of hook_schema().
+  */
+function sluser_schema() {
+  $schema['sluser'] = array(
+    'description' => t('Mapping SecondLife users to Drupal users.'),
+    'fields' => array(
+      'vid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'nid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'grid_nid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'user_name' => array(
+        'type'        => 'varchar',
+        'length'      => 255,
+        'not null'    => TRUE,
+        'default'     => '',
+        'description' => t('User name.'),
+      ),
+      'user_uuid' => array(
+        'type'        => 'varchar',
+        'length'      => 36,
+        'not null'    => TRUE,
+        'default'     => '',
+        'description' => t('User key.'),
+      ),
+      'reg_key' => array(
+        'type'        => 'varchar',
+        'length'      => 10,
+        'not null'    => TRUE,
+        'default'     => '',
+        'description' => t('Registration key.'),
+      ),
+    ),
+    'primary key' => array('vid', 'nid'),
+  );
+  return $schema;
+}

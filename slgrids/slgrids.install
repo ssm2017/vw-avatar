@@ -1,0 +1,41 @@
+<?php
+// $Id: slgrids.install,v 1.1.2.1 2009/10/14 23:51:34 jhodgdon Exp $
+
+/**
+ * @file
+ * Node example module's install and uninstall code.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function slgrids_install() {
+  drupal_install_schema('slgrids');
+  db_query("DELETE FROM {variable} WHERE name LIKE 'slgrids%%'");
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function slgrids_uninstall() {
+  drupal_uninstall_schema('slgrids');
+  db_query("DELETE FROM {variable} WHERE name LIKE 'slgrids%%'");
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function slgrids_schema() {
+  $schema['sluser_grids'] = array(
+    'fields' => array(
+      'vid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'nid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'login_uri'  => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'default' => ''),
+      'xmlrpc_url' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'default' => ''),
+      'httpIn_url' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'default' => ''),
+    ),
+    'primary key' => array('vid', 'nid'),
+  );
+
+  return $schema;
+}

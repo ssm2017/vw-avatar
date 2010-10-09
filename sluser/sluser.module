@@ -1,0 +1,350 @@
+<?php
+
+define('SLUSER_MACHINE_NAME', variable_get('sluser_global_settings_terminology_sluser_machine_name',  'sluser'));
+define('SLUSER_HUMAN_NAME',variable_get('sluser_global_settings_terminology_sluser_human_name',  'sluser'));
+
+/**
+ * Manage the in-wolrd requests.
+ */
+function sluser_dispatch($cmd, &$sl, $args) {
+  module_load_include("inc", "sluser", "sluser.inworld");
+  sluser_inworld_controller($cmd, $sl, $args);
+}
+
+function sluser_views_api() {
+  return array('api' => 2.0);
+}
+
+/**
+ * Hook menu()
+ */
+function sluser_menu() {
+  $items = array();
+  $name = SLUSER_MACHINE_NAME. '/users/renew-regkey/js';
+  $items[$name] = array(
+    'title'             => 'Javascript AHAH renew regkey',
+    'page callback'     => 'sluser_renew_regkey_js',
+    'access callback'   => TRUE,
+    'type'              => MENU_CALLBACK,
+  );
+  $items['admin/settings/secondlife/sluser'] = array(
+    'title'             => t('SlUser'),
+    'description'       => t('Settings for the SlUser module.'),
+    'page callback'     => 'drupal_get_form',
+    'page arguments'    => array('sluser_global_settings_form'),
+    'access arguments'  => array('administer site configuration'),
+    'file'              => 'sluser.admin.inc',
+    'type'              => MENU_LOCAL_TASK
+  );
+
+  return $items;
+}
+
+/**
+ * Explain how the module demonstrates a new node type.sluser.test
+ */
+function sluser_info() {
+  return t('SlUser defines a new node type, "SlUser", which can be created at !link.', array('!link' => l(t('node/add/avatar'), 'node/add/avatar')));
+}
+
+/**
+ * Implementation of hook_node_info().
+ */
+function sluser_node_info() {
+  return array(
+    'avatar' => array(
+      'name'        => t('Avatar'),
+      'module'      => 'sluser',
+      'description' => t("An avatar to link to a grid."),
+      'has_title'   => TRUE,
+      'title_label' => t('Name'),
+      'has_body'    => TRUE,
+      'body_label'  => t('Description'),
+      'locked'      => TRUE
+    )
+  );
+}
+
+/**
+ * Implementation of hook_access().
+ */
+function sluser_access($op, $node, $account) {
+  if ($op == 'create') {
+    return user_access('create avatar content', $account);
+  }
+
+  if ($op == 'update') {
+    if (user_access('edit any avatar content', $account) || (user_access('edit own avatar content', $account) && ($account->uid == $node->uid))) {
+      return TRUE;
+    }
+  }
+
+  if ($op == 'delete') {
+    if (user_access('delete any avatar content', $account) || (user_access('delete own avatar content', $account) && ($account->uid == $node->uid))) {
+      return TRUE;
+    }
+  }
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function sluser_perm() {
+  return array(
+    'create avatar content',
+    'delete own avatar content',
+    'delete any avatar content',
+    'edit own avatar content',
+    'edit any avatar content',
+  );
+}
+
+/**
+ * Implementation of hook_form().
+ */
+function sluser_form(&$node, $form_state) {
+
+  // check if there are some grids
+  $grids = db_result(db_query("SELECT COUNT(*) FROM {node} WHERE type='grid'"));
+  if (!$grids) {
+    drupal_set_message(t("You need to create a grid before creating an avatar."), 'error');
+    drupal_goto('node/add/grid');
+    return;
+  }
+
+  $type = node_get_types('type', $node);
+
+  if ($type->has_title) {
+    $form['title'] = array(
+      '#type'           => 'textfield',
+      '#title'          => check_plain($type->title_label),
+      '#required'       => TRUE,
+      '#default_value'  => $node->title,
+      '#weight'         => -5
+    );
+  }
+
+  // get the grids list
+  $grids = array();
+  $result = db_query("SELECT nid, title FROM {node} WHERE type='grid'");
+  while ($grid = db_fetch_object($result)) {
+    $grids[$grid->nid] = $grid->title;
+  }
+  $form['grid_nid'] = array(
+    '#type'           => 'select',
+    '#title'          => t('Grid'),
+    '#required'       => TRUE,
+    '#options'        => $grids,
+    '#default_value'  => isset($node->grid_nid) ? $node->grid_nid : array(),
+    '#weight'         => -3
+  );
+  $form['user_name'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('user_name'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->user_name) ? $node->user_name : '',
+    '#weight'         => -3
+  );
+  $form['user_uuid'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('user_uuid'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->user_uuid) ? $node->user_uuid : '',
+    '#weight'         => -3
+  );
+  $form['reg_key'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('reg_key'),
+    '#required'       => TRUE,
+    '#default_value'  => isset($node->reg_key) ? $node->reg_key : '',
+    '#weight'         => -3
+  );
+
+  if ($type->has_body) {
+    $form['body_field'] = node_body_field($node, $type->body_label, $type->min_word_count);
+  }
+  return $form;
+}
+
+/**
+ * Implementation of hook_insert().
+ */
+function sluser_insert($node) {
+  db_query("INSERT INTO {sluser} ("
+          . " vid," // 1
+          . " nid," // 2
+          . " grid_nid," // 3
+          . " user_name," // 4
+          . " user_uuid," // 5
+          . " reg_key" // 6
+          . ") VALUES ("
+          . " %d," // 1
+          . " %d," // 2
+          . " %d," // 3
+          . " '%s'," // 4
+          . " '%s'," // 5
+          . " '%s'" // 6
+          . ")", $node->vid, $node->nid, $node->grid_nid, $node->user_name, $node->user_uuid, $node->reg_key);
+}
+
+/**
+ * Implementation of hook_update().
+ */
+function sluser_update($node) {
+  if ($node->revision) {
+    sluser_insert($node);
+  }
+  else {
+    db_query("UPDATE {sluser} SET"
+            . " grid_nid = %d,"
+            . " user_name = '%s',"
+            . " user_uuid = '%s',"
+            . " reg_key = '%s'"
+            . " WHERE vid = %d", $node->grid_nid, $node->user_name, $node->user_uuid, $node->reg_key, $node->vid);
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function sluser_nodeapi(&$node, $op, $teaser, $page) {
+  switch ($op) {
+    case 'delete revision':
+      db_query('DELETE FROM {sluser} WHERE vid = %d', $node->vid);
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_delete().
+ */
+function sluser_delete($node) {
+  // Notice that we're matching all revision, by using the node's nid.
+  db_query('DELETE FROM {sluser} WHERE nid = %d', $node->nid);
+}
+
+/**
+ * Implementation of hook_load().
+ */
+function sluser_load($node) {
+  $additions = db_fetch_object(db_query('SELECT grid_nid, user_name, user_uuid, reg_key FROM {sluser} WHERE vid = %d', $node->vid));
+  return $additions;
+}
+
+/**
+ * Implementation of hook_view().
+ */
+function sluser_view($node, $teaser = FALSE, $page = FALSE) {
+
+  $node = node_prepare($node, $teaser);
+
+  // define the theme to use
+  $theme = 'sluser_node_page';
+  if ($teaser) {
+    $theme = 'sluser_node_teaser';
+  }
+
+  $node->reg_key_form = drupal_get_form('sluser_renew_reg_key_form', $node->nid);
+  $node->content['myfield'] = array(
+    '#value' => theme($theme, $node),
+    '#weight' => 1,
+  );
+
+  return $node;
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function sluser_theme() {
+  return array(
+    'sluser_node_page' => array(
+      'path'      => drupal_get_path('module', 'sluser').'/theme',
+      'template'  => 'sluser_node_page',
+      'arguments' => array('node' => new stdClass),
+    ),
+    'sluser_node_teaser' => array(
+      'path'      => drupal_get_path('module', 'sluser').'/theme',
+      'template'  => 'sluser_node_teaser',
+      'arguments' => array('node' => new stdClass),
+    ),
+  );
+}
+
+/**
+ *
+ */
+function sluser_renew_reg_key_form($form_state, $nid) {
+  $form = array();
+
+  // fieldset for regkey
+  $form['reg_key'] = array(
+    '#type'         => 'fieldset',
+    '#title'        => t('Renew regkey'),
+    '#collapsible'  => TRUE,
+    '#collapsed'    => TRUE,
+  );
+  // reg key renew
+  $form['reg_key']['renew_regkey_container'] = array(
+    '#value'  => '&nbsp;',
+    '#prefix' => '<div id="renew-regkey-container">',
+    '#suffix' => '</div>',
+  );
+  $form['reg_key']['item'] = array(
+    '#type'   => 'item',
+    '#title'  => t('Regkey'),
+    '#value'  => t("Push the button if you would like to renew your regkey for this avatar."),
+  );
+  $form['reg_key']['nid'] = array(
+    '#type'   => 'hidden',
+    '#value'  => $nid,
+  );
+  $form['reg_key']['renew_regkey_button'] = array(
+    '#type'   => 'submit',
+    '#value'  => t('Renew Regkey'),
+    '#weight' => 1,
+    '#ahah'   => array(
+      'path'    => SLUSER_MACHINE_NAME. '/users/renew-regkey/js',
+      'wrapper' => 'renew-regkey-container',
+      'method'  => 'replace',
+      'effect'  => 'fade',
+    ),
+  );
+
+  return $form;
+}
+
+/**
+ * Generate a regkey
+ */
+function sluser_generate_regkey($nid) {
+  // generate a reg key
+  $node = node_load($nid);
+  $node->reg_key = module_invoke('user', 'password');
+  node_save($node);
+  // TODO : don't show message if user is not enabled
+  //if ($account->status) {
+    drupal_set_message(t('New reg key is : '). $node->reg_key);
+  //}
+}
+
+/**
+ * AHAH callback to renew the regkey
+ */
+function sluser_renew_regkey_js() {
+  // drupal's alchemy
+  $form_state = array('storage' => NULL, 'submitted' => FALSE);
+  $form_build_id = $_POST['form_build_id'];
+  $form = form_get_cache($form_build_id, $form_state);
+  $args = $form['#parameters'];
+  $form_id = array_shift($args);
+  $form_state['post'] = $form['#post'] = $_POST;
+  $form['#programmed'] = $form['#redirect'] = FALSE;
+  $renew_regkey_form = $form['sluser']['renew_regkey_container'];
+  unset($renew_regkey_form['#prefix'], $renew_regkey_form['#suffix']);
+  // generate the regkey
+  sluser_generate_regkey($form_state['post']['nid']);
+  // return the value
+  $output = theme('status_messages') . drupal_render($renew_regkey_form);
+  drupal_json(array('status' => TRUE, 'data' => $output));
+}
