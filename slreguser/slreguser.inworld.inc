@@ -214,10 +214,29 @@ function slreguser_quick_register(&$sl, $args) {
   global $base_url;
   $reponse = array();
 
+  // check if terminal is disabled
+  $terminal_enabled = slterminals_check_disabled($sl->objectkey);
+  if (!$terminal_enabled['success']) {
+    $response['status']  = FALSE;
+    $response['message'] = 'disable;'. $terminal_enabled['message'];
+    return $response;
+  }
+
+  $terminal = $terminal_enabled['data']['terminal'];
+  $grid     = $terminal_enabled['data']['grid'];
+
   // check the terminal password
-  if (!slterminals_check_password($args['password'], $args['keypass'])) {
+  $params = array(
+    'pass'            => $args['password'],
+    'key'             => $args['keypass'],
+    'use_token'       => TRUE,
+    'token_sent'      => $args['token'],
+    'terminal_token'  => $terminal->token
+  );
+  $pass_check = slterminals_check_password($params);
+  if (!$pass_check['success']) {
     $response['status']   = FALSE;
-    $response['message']  = 'error;'. t('Wrong terminal password.');
+    $response['message']  = 'disable;'. $pass_check['message'];
     return $response;
   }
 
@@ -242,9 +261,6 @@ function slreguser_quick_register(&$sl, $args) {
     $response['message']  = "error;". $check_username;
     return $response;
   }
-
-  // get grid info
-  $grid = slgrids_get_grid_by_terminal_uuid($sl->objectkey);
 
   // check if this username is already registered
   $account = user_load(array('name' => $user_name));

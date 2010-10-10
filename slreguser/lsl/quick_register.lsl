@@ -42,6 +42,7 @@ string _SERVER_ERROR = "Server error";
 // **********************
 //          VARS
 // **********************
+string token;
 string url = "";
 string url2 = "";
 string password = "";
@@ -59,7 +60,8 @@ integer menu_channel;
 string user_name;
 // separators
 string HTTP_SEPARATOR = ";";
-string PARAM_SEPARATOR = "||";
+string PARAM_SEPARATOR = "┆";
+string ARGS_SEPARATOR = ":";
 // **********************
 //          CONSTANTS
 // **********************
@@ -82,7 +84,7 @@ integer GET_ACTUAL_USER = 20102;
 // **********************
 // parse parameters
 integer parseParams(string params) {
-    // url ; url2 ; display_info ; update_speed ; busy_time
+    // url | url2 | display_info | update_speed | busy_time | http_separator | args separator | token
     list values = llParseStringKeepNulls(params, [PARAM_SEPARATOR], []);
     url = llList2String(values, 0);
     url2 = llList2String(values, 1);
@@ -91,6 +93,8 @@ integer parseParams(string params) {
     update_speed = llList2Integer(values, 4);
     busy_time = llList2Integer(values, 5);
     HTTP_SEPARATOR = llList2String(values, 6);
+    ARGS_SEPARATOR = llList2String(values, 7);
+    token = llList2String(values, 8);
     if (url != "" && url2 != "") {
         return TRUE;
     }
@@ -112,12 +116,14 @@ registerSave() {
                         "app=slreguser"
                         +"&cmd=quickRegister"
                         +"&output_type=message"
+                        +"&args_separator="+ARGS_SEPARATOR
                         +"&arg="
                         // password
-                        +"password="+md5pass+":"
-                        +"keypass="+(string)keypass+":"
+                        +"password="+md5pass+ARGS_SEPARATOR
+                        +"keypass="+(string)keypass+ARGS_SEPARATOR
+                        +"token="+ llMD5String(token, keypass)+ARGS_SEPARATOR
                         // user values
-                        +"user_name="+user_name+":"
+                        +"user_name="+user_name+ARGS_SEPARATOR
                         +"user_key="+(string)actual_user);
 }
 // get server answer
@@ -243,6 +249,14 @@ state run {
                 state register;
             }
         }
+        else if (num == SET_PARAMS) {
+            if (parseParams(str)) {
+                state run;
+            }
+            else {
+                llOwnerSay(_PARSE_PARAMS_ERROR);
+            }
+        }
         else if (num == RESET) {
             llResetScript();
         }
@@ -269,9 +283,6 @@ state register {
             busy = FALSE;
             actual_user = NULL_KEY;
         }
-        else if (num == RESET) {
-            llResetScript();
-        }
         else if (num == lnkDialogTimeOut) {
             dialogNotify(id, _MENU_TIMEOUT);
             state run;
@@ -280,6 +291,17 @@ state register {
             if (str == _RESET) {
                 llResetScript();
             }
+        }
+        else if (num == SET_PARAMS) {
+            if (parseParams(str)) {
+                state run;
+            }
+            else {
+                llOwnerSay(_PARSE_PARAMS_ERROR);
+            }
+        }
+        else if (num == RESET) {
+            llResetScript();
         }
     }
     http_response(key request_id, integer status, list metadata, string body) {
@@ -297,6 +319,10 @@ state register {
             if (request_id == registerSaveId) {
                 if (answer == "success" || answer == "error" || answer == "success need activate" || answer == "success reg complete") {
                     llInstantMessage(actual_user, value);
+                }
+                else if (answer == "disable") {
+                    llMessageLinked(LINK_THIS, RESET, "", NULL_KEY);
+                    llResetScript();
                 }
             }
         }

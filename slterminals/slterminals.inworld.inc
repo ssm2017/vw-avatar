@@ -40,37 +40,32 @@ function slterminals_register_terminal(&$sl, $args) {
   $response = array();
 
   // check the terminal password
-  if (!slterminals_check_password($args['password'], $args['keypass'])) {
-    $response['status']   = FALSE;
-    $response['message']  = 'error;'. t('Wrong terminal password.');
+  $pass_check = slterminals_check_password(array('pass' => $args['password'], 'key' => $args['keypass']));
+  if (!$pass_check['success']) {
+    $response['status'] = FALSE;
+    $response['message'] = 'disable;'. $pass_check['message'];
     return $response;
   }
 
-  $args_separator = $sl->args_separator;
-
-  // check if this grid exists
-  //$grid_login_uri = urldecode($args['grid_login_uri']);
-  $grid_login_uri = $args['grid_login_uri'];
-  $grid = db_fetch_object(db_query("SELECT nid FROM {sluser_grids} WHERE login_uri = '%s'", $grid_login_uri));
-  if (!$grid->nid) {
-    $response['status']   = FALSE;
-    $response['message']  = 'error;'. t('The login uri : @login_uri is not registered on the website.', array('@login_uri'=>$grid_login_uri));
+  // check if terminal is disabled
+  $terminal_enabled = slterminals_check_disabled($sl->objectkey, $args['grid_login_uri']);
+  if (!$terminal_enabled['success']) {
+    $response['status']  = FALSE;
+    $response['message'] = 'disable;'. $terminal_enabled['message'];
     return $response;
   }
 
-  // check if the terminal exists
+  // build the terminal
   $node = new stdclass;
   $node->type = 'terminal';
   $node->title = $sl->objectname;
   $node->uid = variable_get('slterminals_global_settings_defaut_terminal_uid', "0");
-  $exists = FALSE;
-  $terminal = db_fetch_object(db_query("SELECT nid FROM {sluser_terminals} WHERE object_uuid = '%s'", $sl->objectkey));
-  if ($terminal->nid) {
-    $node = node_load($terminal->nid);
-    $exists = TRUE;
+  $exists = ($terminal_enabled['data']['terminal']->nid) ? TRUE : FALSE;
+  if ($exists) {
+    $node = node_load($terminal_enabled['data']['terminal']->nid);
   }
 
-  $node->grid_nid     = $grid->nid;
+  $node->grid_nid     = $terminal_enabled['data']['grid']->nid;
   $node->sim_hostname = $args['sim_hostname'];
   $node->object_name  = $sl->objectname;
   $node->object_uuid  = $sl->objectkey;
@@ -78,6 +73,13 @@ function slterminals_register_terminal(&$sl, $args) {
   $node->position     = strtr($sl->position, array('(' =>'', ')' =>'', ',' =>'/', ' '=>''));
   $node->owner_uuid   = $sl->ownerkey;
   $node->owner_name   = $sl->ownername;
+  if (!$node->nid) {
+    $node->status = 0;
+  }
+
+  // add the security token
+  module_load_include("helpers.inc", "sluser");
+  $node->token = sluser_uuid_create();
 
   if ($args['rpc_channel'] != '') {
     $node->rpc_channel = $args['rpc_channel'];
@@ -85,9 +87,11 @@ function slterminals_register_terminal(&$sl, $args) {
   if ($args['http_url'] != '') {
     $node->http_url = $args['http_url'];
   }
+
   node_save($node);
+
   $response['status']   = TRUE;
-  $response['message']  = $exists ? 'success;'. t('Terminal updated.') : 'success;'. t('New terminal added.');
+  $response['message']  = $exists ? 'success;'. t('Terminal updated.'). ';'. $node->token : 'success;'. t('New terminal added.'). ';'. $node->token;
   return $response;
 }
 
@@ -96,9 +100,25 @@ function slterminals_log($sl, $args) {
   $msg = '';
 
   // check the terminal password
-  if (!sluser_check_password($args['password'], $args['keypass'])) {
+  if (!slterminals_check_password($args['password'], $args['keypass'])) {
     $response['status']   = FALSE;
     $response['message']  = 'error;'. t('Wrong terminal password.');
+    return $response;
+  }
+
+  // get the terminal values
+  $terminal = db_fetch_object(db_query("SELECT * FROM {sluser_terminals} WHERE object_uuid = '%s'", $sl->objectkey));
+
+  if (!$terminal) {
+    $response['status']   = FALSE;
+    $response['message']  = 'error;'. t('Terminal not found.');
+    return $response;
+  }
+
+  // check the token
+  if ($terminal->token != $args['token']) {
+    $response['status']   = FALSE;
+    $response['message']  = 'error;'. t('Wrong terminal token.');
     return $response;
   }
 

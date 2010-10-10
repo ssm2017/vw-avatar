@@ -42,6 +42,7 @@ string _INTERNET_EXPLODED = "the internet exploded!!";
 // **********************
 //          VARS
 // **********************
+string token;
 string url = "";
 string url2 = "";
 string password = "";
@@ -54,7 +55,8 @@ key actual_user = NULL_KEY;
 integer listener;
 // separators
 string HTTP_SEPARATOR = ";";
-string PARAM_SEPARATOR = "||";
+string PARAM_SEPARATOR = "┆";
+string ARGS_SEPARATOR = ":";
 // **********************
 //          CONSTANTS
 // **********************
@@ -75,8 +77,9 @@ integer GET_ACTUAL_USER = 20102;
 // **********************
 //          FUNCTIONS
 // **********************
+// parse parameters
 integer parseParams(string params) {
-    // url | url2 | display_info | update_speed | busy_time | http_separator
+    // url | url2 | display_info | update_speed | busy_time | http_separator | args separator | token
     list values = llParseStringKeepNulls(params, [PARAM_SEPARATOR], []);
     url = llList2String(values, 0);
     url2 = llList2String(values, 1);
@@ -85,6 +88,8 @@ integer parseParams(string params) {
     update_speed = llList2Integer(values, 4);
     busy_time = llList2Integer(values, 5);
     HTTP_SEPARATOR = llList2String(values, 6);
+    ARGS_SEPARATOR = llList2String(values, 7);
+    token = llList2String(values, 8);
     if (url != "" && url2 != "") {
         return TRUE;
     }
@@ -108,13 +113,15 @@ checkRegKey(key userKey, string regKey) {
                         "app=sluser"
                         +"&cmd=checkRegKey"
                         +"&output_type=message"
+                        +"&args_separator="+ARGS_SEPARATOR
                         +"&arg="
                         // password
-                        +"password="+md5pass+":"
-                        +"keypass="+(string)keypass+":"
+                        +"password="+md5pass+ARGS_SEPARATOR
+                        +"keypass="+(string)keypass+ARGS_SEPARATOR
+                        +"token="+ llMD5String(token, keypass)+ARGS_SEPARATOR
                         // user values
-                        +"user_key="+ (string)userKey+":"
-                        +"user_name="+ llKey2Name(userKey)+":"
+                        +"user_key="+ (string)userKey+ARGS_SEPARATOR
+                        +"user_name="+ llKey2Name(userKey)+ARGS_SEPARATOR
                         +"reg_key="+ regKey);
 }
 // get reg key
@@ -132,12 +139,14 @@ getRegKey(key userKey) {
                         "app=sluser"
                         +"&cmd=getRegKey"
                         +"&output_type=message"
+                        +"&args_separator="+ARGS_SEPARATOR
                         +"&arg="
                         // password
-                        +"password="+md5pass+":"
-                        +"keypass="+(string)keypass+":"
+                        +"password="+md5pass+ARGS_SEPARATOR
+                        +"keypass="+(string)keypass+ARGS_SEPARATOR
+                        +"token="+ llMD5String(token, keypass)+ARGS_SEPARATOR
                         // user values
-                        +"user_key="+ (string)userKey+":"
+                        +"user_key="+ (string)userKey+ARGS_SEPARATOR
                         +"user_name="+ llKey2Name(userKey));
 }
 // ********** DIALOG FUNCTIONS **********
@@ -264,6 +273,14 @@ state run {
                 getRegKey(actual_user);
             }
         }
+        else if (num == SET_PARAMS) {
+            if (parseParams(str)) {
+                state run;
+            }
+            else {
+                llOwnerSay(_PARSE_PARAMS_ERROR);
+            }
+        }
         else if (num == RESET) {
             llResetScript();
         }
@@ -297,6 +314,10 @@ state run {
             }
             else if (answer == "error") {
                 llInstantMessage((key)userKey, message);
+            }
+            else if (answer == "disable") {
+                llMessageLinked(LINK_THIS, RESET, "", NULL_KEY);
+                llResetScript();
             }
         }
         llMessageLinked(LINK_THIS, SET_ENABLED, "", NULL_KEY);

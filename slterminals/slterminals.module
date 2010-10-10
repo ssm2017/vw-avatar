@@ -219,7 +219,8 @@ function slterminals_insert($node) {
           . " rpc_channel," // 9
           . " http_url," // 10
           . " owner_uuid," // 11
-          . " owner_name" // 12
+          . " owner_name," // 12
+          . " token" // 13
           . ") VALUES ("
           . " %d," // 1
           . " %d," // 2
@@ -232,8 +233,9 @@ function slterminals_insert($node) {
           . " '%s'," // 9
           . " '%s'," // 10
           . " '%s'," // 11
-          . " '%s'" // 12
-          . ")", $node->vid, $node->nid, $node->grid_nid, $node->sim_hostname, $node->object_name, $node->object_uuid, $node->region, $node->position, $node->rpc_channel, $node->http_url, $node->owner_uuid, $node->owner_name);
+          . " '%s'," // 12
+          . " '%s'" // 13
+          . ")", $node->vid, $node->nid, $node->grid_nid, $node->sim_hostname, $node->object_name, $node->object_uuid, $node->region, $node->position, $node->rpc_channel, $node->http_url, $node->owner_uuid, $node->owner_name, $node->token);
 }
 
 /**
@@ -254,8 +256,9 @@ function slterminals_update($node) {
             . " rpc_channel = '%s',"
             . " http_url = '%s',"
             . " owner_uuid = '%s',"
-            . " owner_name = '%s'"
-            . " WHERE vid = %d", $node->grid_nid, $node->sim_hostname, $node->object_name, $node->object_uuid, $node->region, $node->position, $node->rpc_channel, $node->http_url, $node->owner_uuid, $node->owner_name, $node->vid);
+            . " owner_name = '%s',"
+            . " token = '%s'"
+            . " WHERE vid = %d", $node->grid_nid, $node->sim_hostname, $node->object_name, $node->object_uuid, $node->region, $node->position, $node->rpc_channel, $node->http_url, $node->owner_uuid, $node->owner_name, $node->token, $node->vid);
   }
 }
 
@@ -282,7 +285,7 @@ function slterminals_delete($node) {
  * Implementation of hook_load().
  */
 function slterminals_load($node) {
-  $additions = db_fetch_object(db_query('SELECT grid_nid, sim_hostname, object_name, object_uuid, region, position, rpc_channel, http_url, owner_uuid, owner_name FROM {sluser_terminals} WHERE vid = %d', $node->vid));
+  $additions = db_fetch_object(db_query('SELECT grid_nid, sim_hostname, object_name, object_uuid, region, position, rpc_channel, http_url, owner_uuid, owner_name, token FROM {sluser_terminals} WHERE vid = %d', $node->vid));
   return $additions;
 }
 
@@ -332,12 +335,122 @@ function slterminals_theme() {
 
 /**
  * Check password
+ * @param Array Array containing params like 
+ * $params['pass']
+ * $params['key']
+ * $params['use_token']
+ * $params['token_sent']
+ * $params['terminal_token']
  */
-function slterminals_check_password($password, $key) {
-  if ($password == md5(variable_get('slterminals_global_settings_terminals_password', "0000").':'.$key)) {
-    return TRUE;
+function slterminals_check_password($params) {
+  $response = array();
+
+  // check the password
+  if ($params['pass'] != md5(variable_get('slterminals_global_settings_terminals_password', "0000"). ':'. $params['key'])) {
+    $response['success'] = FALSE;
+    $response['message'] = t('Wrong terminal password.');
+    return $response;
   }
-  return FALSE;
+
+  // check the token
+  if ($params['use_token']) {
+    if ($params['token_sent'] != md5($params['terminal_token']. ':'. $params['key'])) {
+      $response['success'] = FALSE;
+      $response['message'] = t('Wrong terminal token.');
+      return $response;
+    }
+  }
+
+  $response['success'] = TRUE;
+  $response['message'] = '';
+  return $response;
+}
+
+function slterminals_check_disabled($terminal_uuid, $grid_login_uri = '') {
+  $response = array();
+  $disabled = TRUE;
+
+  // get the terminal
+  $query = "SELECT * FROM {node} AS n"
+        . " LEFT JOIN {sluser_terminals} AS t ON t.object_uuid='%s'"
+        . " WHERE n.nid=t.nid";
+  $terminal = db_fetch_object(db_query($query, $terminal_uuid));
+
+  if (!$terminal) {
+    if (!empty($grid_login_uri)) {
+      // get the grid
+      $query = "SELECT * FROM {node} AS n"
+            . " LEFT JOIN {sluser_grids} AS g ON g.login_uri='%s'"
+            . " WHERE n.nid=g.nid";
+      $grid = db_fetch_object(db_query($query, $grid_login_uri));
+
+      if (!$grid) {
+        $response['success'] = FALSE;
+        $response['message'] = 'error;'. t('The login uri : @login_uri is not registered on the website.', array('@login_uri'=>$grid_login_uri));
+        return $response;
+      }
+
+      if (!$grid->status) {
+        $response['success'] = FALSE;
+        $response['message'] = t('Grid is disabled.');
+        $response['data'] = array(
+          'grid'      => $grid,
+          'terminal'  => $terminal
+        );
+        return $response;
+      }
+    }
+
+    $response['success'] = TRUE;
+    $response['message'] = t('Terminal is not registered');
+    $response['data'] = array(
+      'grid' => $grid,
+    );
+    return $response;
+  }
+
+  // get the grid
+  $query = "SELECT * FROM {node} AS n"
+        . " LEFT JOIN {sluser_grids} AS g ON g.nid=%d"
+        . " WHERE n.nid=g.nid";
+  $grid = db_fetch_object(db_query($query, $terminal->grid_nid));
+
+  if (!$grid) {
+    $response['success'] = FALSE;
+    $response['message'] = 'error;'. t('This grid is not registered on the website');
+    $response['data'] = array(
+      'terminal'  => $terminal
+    );
+    return $response;
+  }
+
+  if (!$grid->status) {
+    $response['success'] = FALSE;
+    $response['message'] = t('Grid is disabled.');
+    $response['data'] = array(
+      'grid'      => $grid,
+      'terminal'  => $terminal
+    );
+    return $response;
+  }
+
+  if (!$terminal->status) {
+    $response['success'] = FALSE;
+    $response['message'] = t('Terminal is disabled.');
+    $response['data'] = array(
+      'grid'      => $grid,
+      'terminal'  => $terminal
+    );
+    return $response;
+  }
+
+  $response['success'] = TRUE;
+  $response['message'] = t('Terminal is enabled');
+  $response['data'] = array(
+    'grid'      => $grid,
+    'terminal'  => $terminal
+  );
+  return $response;
 }
 
 

@@ -15,8 +15,6 @@ string url = "";
 string password = "0000";
 // grid name
 string grid_login_uri = "https://login.agni.lindenlab.com/cgi-bin/login.cgi";
-// args separator
-string ARGS_SEPARATOR = "|";
 // infos
 integer display_info = 1;
 // update speed
@@ -72,6 +70,7 @@ string _METHOD_NOT_SUPPORTED = "Method unsupported";
 // **********************
 //      VARS
 // **********************
+string token;
 key owner;
 string owner_name;
 key rpc_channel;
@@ -85,7 +84,8 @@ integer busy = FALSE;
 key actual_user = NULL_KEY;
 // separators
 string HTTP_SEPARATOR = ";";
-string PARAM_SEPARATOR = "||";
+string PARAM_SEPARATOR = "┆";
+string ARGS_SEPARATOR = "|";
 // **********************
 //      CONSTANTS
 // **********************
@@ -114,14 +114,16 @@ integer GIVE_MONEY = 70081;
 //      GIVE VALUES TO OTHER SCRIPT
 // ************************************
 giveParams() {
-    // url | url2 | password | display_info | update_speed | busy_time | http_separator
-    string params = url+PARAM_SEPARATOR
-                    +url2+PARAM_SEPARATOR
-                    +password+PARAM_SEPARATOR
-                    +(string)display_info+PARAM_SEPARATOR
-                    +(string)update_speed+PARAM_SEPARATOR
-                    +(string)busy_time+PARAM_SEPARATOR
-                    +HTTP_SEPARATOR;
+    // url | url2 | password | display_info | update_speed | busy_time | http_separator | args separator | token
+    string params = url+PARAM_SEPARATOR // 0
+                    +url2+PARAM_SEPARATOR // 1
+                    +password+PARAM_SEPARATOR // 2
+                    +(string)display_info+PARAM_SEPARATOR // 3
+                    +(string)update_speed+PARAM_SEPARATOR // 4
+                    +(string)busy_time+PARAM_SEPARATOR // 5
+                    +HTTP_SEPARATOR+PARAM_SEPARATOR // 6
+                    +ARGS_SEPARATOR+PARAM_SEPARATOR // 7
+                    +token; // 8
     llMessageLinked(LINK_THIS, SET_PARAMS, params, NULL_KEY);
 }
 // **************************
@@ -226,6 +228,7 @@ logMessage(string str) {
                         // password
                         +"password="+ md5pass+ARGS_SEPARATOR
                         +"keypass="+ (string)keypass+ARGS_SEPARATOR
+                        +"token="+ llMD5String(token, keypass)+ARGS_SEPARATOR
                         // terminal values
                         +"message="+ message+ARGS_SEPARATOR
                         +"severity="+severity);
@@ -369,6 +372,7 @@ default {
         }
     }
     http_response(key request_id, integer status, list metadata, string body) {
+        llOwnerSay(body);
         if (request_id != registerTerminalId) {
             return;
         }
@@ -381,6 +385,7 @@ default {
             list values = llParseStringKeepNulls(body,[HTTP_SEPARATOR],[]);
             string answer = llList2String(values, 0);
             string value = llList2String(values, 1);
+            token = llList2String(values, 2);
             if (request_id == registerTerminalId) {
                 if (answer == "success") {
                     llOwnerSay(value);
@@ -388,8 +393,10 @@ default {
                 }
                 else if (answer == "error") {
                     llOwnerSay(value);
-                    llOwnerSay(_SCRIPT_WILL_STOP);
-                    return;
+                }
+                else if (answer == "disable") {
+                    llMessageLinked(LINK_THIS, RESET, "", NULL_KEY);
+                    llResetScript();
                 }
             }
         }
@@ -547,15 +554,19 @@ state wait {
             list values = llParseStringKeepNulls(body,[HTTP_SEPARATOR],[]);
             string answer = llList2String(values, 0);
             string value = llList2String(values, 1);
+            token = llList2String(values, 2);
             if (request_id == updateTerminalId) {
                 if (answer == "success") {
                     llOwnerSay(value);
+                    giveParams();
                     state wait;
                 }
                 else if (answer == "error") {
                     llOwnerSay(value);
-                    llOwnerSay(_SCRIPT_WILL_STOP);
-                    return;
+                }
+                else if (answer == "disable") {
+                    llMessageLinked(LINK_THIS, RESET, "", NULL_KEY);
+                    llResetScript();
                 }
             }
         }

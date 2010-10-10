@@ -40,9 +40,18 @@ function sluser_inworld_check_reg_key($sl, $args) {
   $msg = '';
 
   // check the terminal password
-  if (!slterminals_check_password($args['password'], $args['keypass'])) {
-    $response['status']   = FALSE;
-    $response['message']  = 'error;'. t('Wrong terminal password.');
+  $pass_check = slterminals_check_password(array('pass' => $args['password'], 'key' => $args['keypass']));
+  if (!$pass_check['success']) {
+    $response['status'] = FALSE;
+    $response['message'] = 'error;'. $pass_check['message'];
+    return $response;
+  }
+
+  // check if terminal is disabled
+  $terminal_enabled = slterminals_check_disabled($sl->objectkey, $args['grid_login_uri']);
+  if (!$terminal_enabled['success']) {
+    $response['status']  = FALSE;
+    $response['message'] = 'error;'. $terminal_enabled['message'];
     return $response;
   }
 
@@ -113,15 +122,31 @@ function sluser_inworld_get_reg_key($sl, $args) {
   $response = array();
   $msg = '';
 
-  // check the terminal password
-  if (!slterminals_check_password($args['password'], $args['keypass'])) {
-    $response['status']   = FALSE;
-    $response['message']  = 'error;'. t('Wrong terminal password.');
+  // check if terminal is disabled
+  $terminal_enabled = slterminals_check_disabled($sl->objectkey);
+  if (!$terminal_enabled['success']) {
+    $response['status']  = FALSE;
+    $response['message'] = 'disable;'. $terminal_enabled['message'];
     return $response;
   }
 
-  // get grid info
-  $grid = slgrids_get_grid_by_terminal_uuid($sl->objectkey);
+  $terminal = $terminal_enabled['data']['terminal'];
+  $grid     = $terminal_enabled['data']['grid'];
+
+  // check the terminal password
+  $params = array(
+    'pass'            => $args['password'],
+    'key'             => $args['keypass'],
+    'use_token'       => TRUE,
+    'token_sent'      => $args['token'],
+    'terminal_token'  => $terminal->token
+  );
+  $pass_check = slterminals_check_password($params);
+  if (!$pass_check['success']) {
+    $response['status']  = FALSE;
+    $response['message'] = 'disable;'. $pass_check['message'];
+    return $response;
+  }
 
   // get some vars
   $msg = '';
@@ -146,7 +171,7 @@ function sluser_inworld_get_reg_key($sl, $args) {
   $params['reg_key'] = module_invoke('user', 'password');
   $request = sluser_build_link_request($params);
   if ($request) {
-    $msg .= t('You have a pending validation request on the website. Your validation key is : "!valkey" (without quotes and case sensitive)', array('!valkey' => $request->reg_key));
+    $msg .= t('You have a new pending validation request on the website. Your validation key is : "!valkey" (without quotes and case sensitive)', array('!valkey' => $request->reg_key));
     $response['status'] = TRUE;
     $response['message'] = "success;". $msg;
   }
