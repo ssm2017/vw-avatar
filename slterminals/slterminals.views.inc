@@ -4,10 +4,10 @@
 function slterminals_views_data()  {
 
   $data = array();
-  $data['slterminals']['table']['group']  = t('SlTerminals');
+  $data['sluser_terminals']['table']['group']  = t('SlTerminals');
 
   // tables + fields that can be used for SQL Joins
-  $data['slterminals']['table']['join'] = array(
+  $data['sluser_terminals']['table']['join'] = array(
     'node_revisions' => array(
       'left_field' => 'vid',
       'field' => 'vid',
@@ -18,7 +18,7 @@ function slterminals_views_data()  {
     ),
   );
 // grid_nid
-  $data['slterminals']['grid_nid'] = array(
+  $data['sluser_terminals']['grid_nid'] = array(
     'title' => t('grid_nid'),
     'help' => t('grid_nid.'),
 
@@ -34,7 +34,7 @@ function slterminals_views_data()  {
     ),
   );
 // sim_hostname
-  $data['slterminals']['sim_hostname'] = array(
+  $data['sluser_terminals']['sim_hostname'] = array(
     'title' => t('sim_hostname'),
     'help' => t('sim_hostname.'),
 
@@ -53,7 +53,7 @@ function slterminals_views_data()  {
      ),
   );
 // object_name
-  $data['slterminals']['object_name'] = array(
+  $data['sluser_terminals']['object_name'] = array(
     'title' => t('object_name'),
     'help' => t('object_name.'),
 
@@ -72,7 +72,7 @@ function slterminals_views_data()  {
      ),
   );
 // object_uuid
-  $data['slterminals']['object_uuid'] = array(
+  $data['sluser_terminals']['object_uuid'] = array(
     'title' => t('object_uuid'),
     'help' => t('object_uuid.'),
 
@@ -91,7 +91,7 @@ function slterminals_views_data()  {
      ),
   );
 // region
-  $data['slterminals']['region'] = array(
+  $data['sluser_terminals']['region'] = array(
     'title' => t('region'),
     'help' => t('region.'),
 
@@ -110,7 +110,7 @@ function slterminals_views_data()  {
      ),
   );
 // position
-  $data['slterminals']['position'] = array(
+  $data['sluser_terminals']['position'] = array(
     'title' => t('position'),
     'help' => t('position.'),
 
@@ -129,7 +129,7 @@ function slterminals_views_data()  {
      ),
   );
 // rpc_channel
-  $data['slterminals']['rpc_channel'] = array(
+  $data['sluser_terminals']['rpc_channel'] = array(
     'title' => t('rpc_channel'),
     'help' => t('rpc_channel.'),
 
@@ -148,7 +148,7 @@ function slterminals_views_data()  {
      ),
   );
 // http_url
-  $data['slterminals']['http_url'] = array(
+  $data['sluser_terminals']['http_url'] = array(
     'title' => t('http_url'),
     'help' => t('http_url.'),
 
@@ -167,7 +167,7 @@ function slterminals_views_data()  {
      ),
   );
 // owner_uuid
-  $data['slterminals']['owner_uuid'] = array(
+  $data['sluser_terminals']['owner_uuid'] = array(
     'title' => t('owner_uuid'),
     'help' => t('owner_uuid.'),
 
@@ -186,7 +186,7 @@ function slterminals_views_data()  {
      ),
   );
 // owner_name
-  $data['slterminals']['owner_name'] = array(
+  $data['sluser_terminals']['owner_name'] = array(
     'title' => t('owner_name'),
     'help' => t('owner_name.'),
 
@@ -211,7 +211,7 @@ function slterminals_views_data()  {
   //     by creating a new views type called 'Node example'
   //  This allows it to be selected as the 'view type'
   //          when you initially add a new view.
-  $data['slterminals']['table']['base'] = array(
+  $data['sluser_terminals']['table']['base'] = array(
     'field' => 'vid',
     'title' => t('SlTerminals'),
     'help' => t("slterminals informations."),
@@ -222,7 +222,7 @@ function slterminals_views_data()  {
   //   to access fields in other tables.
 
   // Relationship to the 'Node revision' table
-  $data['slterminals']['vid'] = array(
+  $data['sluser_terminals']['vid'] = array(
     'title' => t('Node revision'),
     'help' => t('The particular node revision the color and quantity is attached to'),
     'relationship' => array(
@@ -236,7 +236,7 @@ function slterminals_views_data()  {
   );
 
   // Relationship to the 'Node' table
-  $data['slterminals']['nid'] = array(
+  $data['sluser_terminals']['nid'] = array(
     'title' => t('Node'),
     'help' => t('The particular node the color and quantity is attached to'),
     'relationship' => array(
@@ -248,9 +248,9 @@ function slterminals_views_data()  {
       'skip base' => array('node', 'node_revisions'),
     ),
   );
-
+/*
   // Relationship to the 'Node' table
-  $data['slterminals']['grid_nid'] = array(
+  $data['sluser_terminals']['grid_nid'] = array(
     'title' => t('Grid'),
     'help' => t('The particular node the grid is attached to'),
     'relationship' => array(
@@ -261,7 +261,7 @@ function slterminals_views_data()  {
       // node so users won't create circular relationships.
       'skip base' => array('node', 'node_revisions'),
     ),
-  );
+  );*/
 //  **** End optional extra for type and relationships
 
   return $data;

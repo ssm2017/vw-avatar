@@ -58,6 +58,14 @@ function sluser_schema() {
         'default'     => '',
         'description' => t('Registration key.'),
       ),
+      'link_status' => array(
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'size'        => 'tiny',
+        'description' => 'Whether the user is active(1) or blocked(0).',
+      ),
+      'link_time' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
     ),
     'primary key' => array('vid', 'nid'),
   );

@@ -1,41 +1,41 @@
-﻿// $Id: reg_key.lsl,v 1.3 2009/09/29 01:53:03 ssm2017binder Exp $
+﻿// $Id: quick_register.lsl,v 1.2 2009/10/05 02:38:24 ssm2017binder Exp $
 // @version SlUser
-// @package CheckUser
+// @package RegUser quickRegister
 // @copyright Copyright wene / ssm2017 Binder (C) 2009. All rights reserved.
 // @license http://www.gnu.org/copyleft/gpl.html GNU/GPL, see LICENSE.php
 // SlUser is free software and parts of it may contain or be derived from the GNU General Public License
 // or other free or open source software licenses.
 
 // **********************
-//      USER PREFS
-// **********************
-// Select if you want to enable the check reg key function from the website (the user get the key on the website, then he validates it inworld) 
-// (0=enabled; 1=disabled)
-integer enable_website_validation = 0;
-// Select if you want to enable the check reg key function from inworld (the user get the key inworld, then he validates it on the website) 
-// (0=enabled; 1=disabled)
-integer enable_inworld_validation = 1;
-// **********************
 //              STRINGS
 // **********************
+// symbols
+string _SYMBOL_RIGHT = "✔";
+string _SYMBOL_WRONG = "✖";
+string _SYMBOL_WARNING = "⚠";
+string _SYMBOL_RESTART = "↺";
+string _SYMBOL_HOR_BAR_1 = "⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌⚌";
+string _SYMBOL_HOR_BAR_2 = "⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊⚊";
+string _SYMBOL_ARROW = "⤷";
 // === common ===
 string _RESET = "Reset";
 string _CLOSE = "Close";
 string _MENU_TIMEOUT = "Menu time-out. Please try again.";
-// === user ===
-string _CHECKING_THE_REGKEY = "Checking the reg key";
-string _GETTING_THE_REGKEY = "Getting the reg key";
-string _ENTER_YOUR_REG_CODE_PLEASE = "Enter your reg code please";
-string _WAIT_FOR_YOUR_REG_CODE_PLEASE = "Wait for your reg code please";
-string _CHECK_KEY = "Check key";
-string _GET_KEY = "Get key";
 // === params ===
 string _PARSE_PARAMS_ERROR = "Parse params error in about module";
-// === http ===
+// === user ===
+string _REGISTER = "Register";
+// === registration ===
+string _CHECKING_REGISTRATION = "Checking registration";
+string _REGISTERING_USER = "Registering user";
+string _QUICK_REGISTER = "Quick register";
+string _CHECK_VALUES_BEFORE_REGISTERING = "Check values before registering";
+// http errors
 string _REQUEST_TIMED_OUT = "Request timed out";
-string _FORBIDEN_ACCESS = "Forbiden access";
+string _FORBIDDEN_ACCESS = "Forbidden access";
 string _PAGE_NOT_FOUND = "Page not found";
 string _INTERNET_EXPLODED = "the internet exploded!!";
+string _SERVER_ERROR = "Server error";
 // ===================================================
 //          NOTHING SHOULD BE CHANGED UNDER THIS LINE
 // ===================================================
@@ -52,6 +52,11 @@ key owner;
 integer busy = FALSE;
 key actual_user = NULL_KEY;
 integer listener;
+// menu
+integer menu_listener;
+integer menu_channel;
+// user registration
+string user_name;
 // separators
 string HTTP_SEPARATOR = ";";
 string PARAM_SEPARATOR = "||";
@@ -75,8 +80,9 @@ integer GET_ACTUAL_USER = 20102;
 // **********************
 //          FUNCTIONS
 // **********************
+// parse parameters
 integer parseParams(string params) {
-    // url | url2 | display_info | update_speed | busy_time | http_separator
+    // url ; url2 ; display_info ; update_speed ; busy_time
     list values = llParseStringKeepNulls(params, [PARAM_SEPARATOR], []);
     url = llList2String(values, 0);
     url2 = llList2String(values, 1);
@@ -93,52 +99,45 @@ integer parseParams(string params) {
 // **********************
 //          HTTP
 // **********************
-// check reg key
-key checkRegKeyId;
-checkRegKey(key userKey, string regKey) {
-    if (display_info) {
-        llOwnerSay(_CHECKING_THE_REGKEY);
-    }
+// register save
+key registerSaveId;
+registerSave() {
+    llInstantMessage(actual_user, _REGISTERING_USER);
     // build password
     integer keypass = (integer)llFrand(9999)+1;
     string md5pass = llMD5String(password, keypass);
     // send the request
-    checkRegKeyId = llHTTPRequest(url+url2, [HTTP_METHOD, "POST", HTTP_MIMETYPE, "application/x-www-form-urlencoded"],
+    registerSaveId = llHTTPRequest(url+url2, [HTTP_METHOD, "POST", HTTP_MIMETYPE, "application/x-www-form-urlencoded"],
                         // common values
-                        "app=sluser"
-                        +"&cmd=checkRegKey"
+                        "app=slreguser"
+                        +"&cmd=quickRegister"
                         +"&output_type=message"
                         +"&arg="
                         // password
                         +"password="+md5pass+":"
                         +"keypass="+(string)keypass+":"
                         // user values
-                        +"user_key="+ (string)userKey+":"
-                        +"user_name="+ llKey2Name(userKey)+":"
-                        +"reg_key="+ regKey);
+                        +"user_name="+user_name+":"
+                        +"user_key="+(string)actual_user);
 }
-// get reg key
-key getRegKeyId;
-getRegKey(key userKey) {
-    if (display_info) {
-        llOwnerSay(_GETTING_THE_REGKEY);
+// get server answer
+getServerAnswer(integer status, string body) {
+    if (status == 499) {
+        llOwnerSay(_SYMBOL_WARNING+ " "+ (string)status+ " "+ _REQUEST_TIMED_OUT);
     }
-    // build password
-    integer keypass = (integer)llFrand(9999)+1;
-    string md5pass = llMD5String(password, keypass);
-    // send the request
-    getRegKeyId = llHTTPRequest(url+url2, [HTTP_METHOD, "POST", HTTP_MIMETYPE, "application/x-www-form-urlencoded"],
-                        // common values
-                        "app=sluser"
-                        +"&cmd=getRegKey"
-                        +"&output_type=message"
-                        +"&arg="
-                        // password
-                        +"password="+md5pass+":"
-                        +"keypass="+(string)keypass+":"
-                        // user values
-                        +"user_key="+ (string)userKey+":"
-                        +"user_name="+ llKey2Name(userKey));
+    else if (status == 403) {
+        llOwnerSay(_SYMBOL_WARNING+ " "+ (string)status+ " "+ _FORBIDDEN_ACCESS);
+    }
+    else if (status == 404) {
+        llOwnerSay(_SYMBOL_WARNING+ " "+ (string)status+ " "+ _PAGE_NOT_FOUND);
+    }
+    else if (status == 500) {
+        llOwnerSay(_SYMBOL_WARNING+ " "+ (string)status+ " "+ _SERVER_ERROR);
+    }
+    else if (status != 403 && status != 404 && status != 500) {
+        llOwnerSay(_SYMBOL_WARNING+ " "+ (string)status+ " "+ _INTERNET_EXPLODED);
+        llOwnerSay(body);
+    }
 }
 // ********** DIALOG FUNCTIONS **********
 // Dialog constants
@@ -197,12 +196,7 @@ default {
 // **********************
 state getParams {
     state_entry() {
-        if (enable_website_validation) {
-            llMessageLinked(LINK_THIS, ADD_APP, _CHECK_KEY, NULL_KEY);
-        }
-        if (enable_inworld_validation) {
-            llMessageLinked(LINK_THIS, ADD_APP, _GET_KEY, NULL_KEY);
-        }
+        llMessageLinked(LINK_THIS, ADD_APP, _QUICK_REGISTER, NULL_KEY);
         llMessageLinked(LINK_THIS, GET_PARAMS, "", NULL_KEY);
     }
     link_message(integer sender_num, integer num, string str, key id) {
@@ -223,15 +217,6 @@ state getParams {
 //          RUN MODE
 // **********************
 state run {
-    listen(integer channel, string name, key id, string message) {
-        if (channel == 0) {
-            llInstantMessage(id, _CHECKING_THE_REGKEY);
-            llMessageLinked(LINK_THIS, SET_ENABLED, "", NULL_KEY);
-            llListenRemove(listener);
-            actual_user = NULL_KEY;
-            checkRegKey(id, message);
-        }
-    }
     link_message(integer sender_num, integer num, string str, key id) {
         if (num == SET_BUSY) {
             busy = TRUE;
@@ -253,52 +238,69 @@ state run {
             if (str == _RESET) {
                 llResetScript();
             }
-            else if (str == _CHECK_KEY) {
+            else if (str == _QUICK_REGISTER) {
                 llMessageLinked(LINK_THIS, SET_BUSY, "", actual_user);
-                llInstantMessage(actual_user, _ENTER_YOUR_REG_CODE_PLEASE);
-                listener = llListen(0, "", actual_user, "");
-            }
-            else if (str == _GET_KEY) {
-                llMessageLinked(LINK_THIS, SET_BUSY, "", actual_user);
-                llInstantMessage(actual_user, _WAIT_FOR_YOUR_REG_CODE_PLEASE);
-                getRegKey(actual_user);
+                state register;
             }
         }
         else if (num == RESET) {
             llResetScript();
         }
     }
+}
+// ************************
+//    CHECK REGISTRATION
+// ************************
+state register {
+    on_rez(integer nbr) {
+        llResetScript();
+    }
+    state_entry() {
+        user_name = llKey2Name(actual_user);
+        registerSave();
+    }
+    link_message(integer sender_num, integer num, string str, key id) {
+        if (num == SET_BUSY) {
+            busy = TRUE;
+            actual_user = id;
+        }
+        else if (num == SET_ENABLED) {
+            llListenRemove(listener);
+            busy = FALSE;
+            actual_user = NULL_KEY;
+        }
+        else if (num == RESET) {
+            llResetScript();
+        }
+        else if (num == lnkDialogTimeOut) {
+            dialogNotify(id, _MENU_TIMEOUT);
+            state run;
+        }
+        else if (num == lnkDialogResponse) {
+            if (str == _RESET) {
+                llResetScript();
+            }
+        }
+    }
     http_response(key request_id, integer status, list metadata, string body) {
-      llOwnerSay(body);
-        if (request_id != checkRegKeyId && request_id != getRegKeyId) {
+        if (request_id != registerSaveId) {
             return;
         }
-        if (status == 499) {
-            llOwnerSay(_REQUEST_TIMED_OUT);
-        }
-        else if (status == 403) {
-            llOwnerSay(_FORBIDEN_ACCESS);
-        }
-        else if (status == 404) {
-            llOwnerSay(_PAGE_NOT_FOUND);
-        }
-        else if (status != 200 && status != 403 && status != 404) {
-            llOwnerSay(_INTERNET_EXPLODED);
+        if (status != 200) {
+            getServerAnswer(status, body);
         }
         else {
-            // get values
             body = llStringTrim(body , STRING_TRIM);
-            list values = llParseStringKeepNulls(body, [HTTP_SEPARATOR], []);
+            list values = llParseStringKeepNulls(body,[HTTP_SEPARATOR],[]);
             string answer = llList2String(values, 0);
-            string message = llList2String(values, 1);
-            string userKey = llList2String(values, 2);
-            if (answer == "success") {
-                llInstantMessage((key)userKey, message);
-            }
-            else if (answer == "error") {
-                llInstantMessage((key)userKey, message);
+            string value = llList2String(values, 1);
+            if (request_id == registerSaveId) {
+                if (answer == "success" || answer == "error" || answer == "success need activate" || answer == "success reg complete") {
+                    llInstantMessage(actual_user, value);
+                }
             }
         }
         llMessageLinked(LINK_THIS, SET_ENABLED, "", NULL_KEY);
+        state run;
     }
 }

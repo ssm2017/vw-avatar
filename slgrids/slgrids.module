@@ -249,3 +249,13 @@ function slgrids_autocomplete($string) {
   print drupal_to_js($matches);
   exit();
 }
+
+/**
+ *
+ */
+function slgrids_get_grid_by_terminal_uuid($terminal_uuid) {
+  $query = "SELECT g.* FROM {sluser_grids} AS g"
+          . " LEFT JOIN {sluser_terminals} AS t ON t.object_uuid='%s'"
+          . " WHERE g.nid=t.grid_nid";
+  return db_fetch_object(db_query($query, $terminal_uuid));
+}

@@ -17,7 +17,10 @@ function sluser_inworld_controller($cmd, &$sl, $args) {
   switch ($cmd) {
 
     case 'checkRegKey':
-      $response = sluser_check_reg_key($sl, $args);
+      $response = sluser_inworld_check_reg_key($sl, $args);
+      break;
+    case 'getRegKey':
+      $response = sluser_inworld_get_reg_key($sl, $args);
       break;
 
     default:
@@ -26,13 +29,13 @@ function sluser_inworld_controller($cmd, &$sl, $args) {
       break;
   }
   $sl->response['status']   = $response['status'];
-  $sl->response['message']  = $response['message'];
+  $sl->response['message']  = $response['message']. ";". $args['user_key'];
 }
 
 /**
 * Check the user's reg key
 */
-function sluser_check_reg_key($sl, $args) {
+function sluser_inworld_check_reg_key($sl, $args) {
   $response = array();
   $msg = '';
 
@@ -100,5 +103,57 @@ function sluser_check_reg_key($sl, $args) {
 */
   $response['status']   = $registered['status'];
   $response['message']  = $registered['message']. ' '. $msg. ';'. $user_key;
+  return $response;
+}
+
+/**
+ *
+ */
+function sluser_inworld_get_reg_key($sl, $args) {
+  $response = array();
+  $msg = '';
+
+  // check the terminal password
+  if (!slterminals_check_password($args['password'], $args['keypass'])) {
+    $response['status']   = FALSE;
+    $response['message']  = 'error;'. t('Wrong terminal password.');
+    return $response;
+  }
+
+  // get grid info
+  $grid = slgrids_get_grid_by_terminal_uuid($sl->objectkey);
+
+  // get some vars
+  $msg = '';
+  $params = array(
+    'user_uuid' => $args['user_key'],
+    'user_name' => $args['user_name'],
+    'website_username' => $args['website_username'],
+    'grid_nid' => $grid->nid
+  );
+
+  // check if there is already a pending regkey for this avatar
+  $result = db_fetch_object(db_query("SELECT * FROM {sluser} WHERE user_uuid='%s' AND grid_nid=%d AND link_status = 0", $params['user_uuid'], $grid->nid));
+
+  if ($result) {
+    $msg .= t('You have a pending validation request on the website. Your validation key is : "!valkey" (without quotes and case sensitive)', array('!valkey' => $result->reg_key));
+    $response['status'] = FALSE;
+    $response['message'] = "error;". $msg;
+    return $response;
+  }
+
+  // create a validation key
+  $params['reg_key'] = module_invoke('user', 'password');
+  $request = sluser_build_link_request($params);
+  if ($request) {
+    $msg .= t('You have a pending validation request on the website. Your validation key is : "!valkey" (without quotes and case sensitive)', array('!valkey' => $request->reg_key));
+    $response['status'] = TRUE;
+    $response['message'] = "success;". $msg;
+  }
+  else {
+    $msg .= "\n". t('There was an error trying to create a request.');
+    $msg .= "\n". t('Please try again later.');
+    $response['message'] = "error;". $msg;
+  }
   return $response;
 }

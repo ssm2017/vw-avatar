@@ -142,7 +142,7 @@ function sluser_views_data()  {
       'skip base' => array('node', 'node_revisions'),
     ),
   );
-
+/*
   // Relationship to the 'Node' table
   $data['sluser']['grid_nid'] = array(
     'title' => t('Grid'),
@@ -155,7 +155,7 @@ function sluser_views_data()  {
       // node so users won't create circular relationships.
       'skip base' => array('node', 'node_revisions'),
     ),
-  );
+  );*/
 //  **** End optional extra for type and relationships
 
   return $data;

@@ -1,0 +1,7 @@
+; $Id: slreguser.info,v 1.2 2009/09/29 01:53:04 ssm2017binder Exp $
+name = SlRegUser
+description = Allow to register a new user from inworld.
+dependencies[] = secondlife
+dependencies[] = sluser
+package = SlUser
+core = 6.x

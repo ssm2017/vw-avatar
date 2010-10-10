@@ -1,0 +1,135 @@
+<?php
+// $Id: slreguser.module,v 1.3 2009/10/05 02:38:24 ssm2017binder Exp $
+/**
+ * @package	SlUser
+ * @subpackage SlRegUser
+ * @copyright	Copyright (C) 2009 Wene / ssm2017 Binder (S.Massiaux). All rights reserved.
+ * @license		GNU/GPL, http://www.gnu.org/licenses/gpl-2.0.html
+ * SlUser is free software. This version may have been modified pursuant to the GNU General Public License,
+ * and as distributed it includes or is derivative of works licensed under the GNU General Public License
+ * or other free or open source software licenses.
+ */
+
+/**
+* Manage the in-world requests.
+*/
+function slreguser_dispatch($cmd, &$sl, $args) {
+  module_load_include("inc", "slreguser", "slreguser.inworld");
+  slreguser_inworld_controller($cmd, $sl, $args);
+}
+
+/**
+* Implementation of hook_help().
+*/
+function slreguser_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#slreguser':
+      $output = '<p>'. t('The SlRegUser module allows you to register a new user from inworld.') .'</p>';
+      return $output;
+  }
+}
+
+/**
+ * 
+ */
+function slreguser_menu() {
+  $items['admin/settings/secondlife/slreguser'] = array(
+    'title'             => 'SlRegUser',
+    'type'              => MENU_LOCAL_TASK,
+    'page callback'     => 'drupal_get_form',
+    'page arguments'    => array('slreguser_global_settings'),
+    'access arguments'  => array('administer site configuration'),
+  );
+  return $items;
+}
+
+/**
+* SlRegUser global settings
+*/
+function slreguser_global_settings() {
+
+  $form = array();
+  // standard registration
+  $form['slreguser']['full_registration'] = array(
+    '#type'         => 'fieldset',
+    '#title'        => t('Full registration'),
+    '#collapsible'  => TRUE,
+    '#collapsed'    => FALSE,
+  );
+  $form['slreguser']['full_registration']['slreguser_global_settings_full_registration_enable'] = array(
+    '#type'           => 'checkbox',
+    '#title'          => t('Allow full registration'),
+    '#default_value'  => variable_get('slreguser_global_settings_full_registration_enable', 1),
+    '#description'    => t('Do you allow registration from inworld ?'),
+  );
+  $form['slreguser']['full_registration']['slreguser_global_settings_email_verification'] = array(
+    '#type'           => 'checkbox',
+    '#title'          => t('Confirm email account'),
+    '#default_value'  => variable_get('slreguser_global_settings_email_verification', 0),
+    '#description'    => t('The user needs to validate email address.'),
+  );
+  $form['slreguser']['full_registration']['slreguser_global_settings_admin_approval_required'] = array(
+    '#type'           => 'checkbox',
+    '#title'          => t('Admin approval'),
+    '#default_value'  => variable_get('slreguser_global_settings_admin_approval_required', 0),
+    '#description'    => t('The account needs to be approval by admin.'),
+  );
+  // quick registration
+  $form['slreguser']['quick_registration'] = array(
+    '#type'         => 'fieldset',
+    '#title'        => t('Quick registration'),
+    '#collapsible'  => TRUE,
+    '#collapsed'    => FALSE,
+  );
+  $form['slreguser']['quick_registration']['slreguser_global_settings_quick_registration_enable'] = array(
+    '#type'           => 'checkbox',
+    '#title'          => t('Allow quick registration'),
+    '#default_value'  => variable_get('slreguser_global_settings_quick_registration_enable', 1),
+    '#description'    => t('Do you allow quick registration from inworld ?'),
+  );
+  $form['slreguser']['quick_registration']['slreguser_global_settings_quick_registration_email_model'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('Profile link model'),
+    '#default_value'  => variable_get('slreguser_global_settings_quick_registration_email_model', '%uuid@mydomain.com'),
+    '#description'    => t('Define the email model (default is "%uuid@mydomain.com"). You can add some vars inside :<br/><ul><li>%uuid for user uuid</li><li>%name for avatar user name</li><li>'),
+  );
+  // get third parties forms
+  $form['slreguser']['settings'] = module_invoke_all('slreguser', 'settings');
+  return system_settings_form($form);
+}
+
+/**
+ * 
+ */
+function slreguser_user($op, &$edit, &$account, $category = NULL) {
+  if ($op == 'login') {
+    // get the avatar
+    $query = "SELECT su.user_uuid FROM {sluser} AS su"
+            . " LEFT JOIN {node} AS n ON n.uid=%d"
+            . " WHERE su.nid=n.nid";
+    $avatar = db_fetch_object(db_query($query, $account->uid, $account->name));
+    if ($avatar) {
+      // build the email address
+      $email = slreguser_build_email_address($avatar);
+      if ($email == $account->mail) {
+        drupal_set_message(l(t('Please update your email address.'), 'user/'. $account->uid. '/edit'), 'error');
+      }
+    }
+  }
+}
+
+/**
+ * Build the email address
+ */
+function slreguser_build_email_address($avatar) {
+  $email = variable_get('slreguser_global_settings_quick_registration_email_model', '%uuid@mydomain.com');
+  // replace spaces in sluser name
+  $avatar->user_name = str_replace(' ', '_', $avatar->user_name);
+  // define the path replacers
+  $replacers = array('%uuid' =>$avatar->user_uuid, '%name' =>$avatar->user_name);
+  // replace the strings
+  foreach ($replacers as $key=>$value) {
+    $email = str_replace($key, $value, $email);
+  }
+  return $email;
+}

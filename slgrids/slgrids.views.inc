@@ -4,10 +4,10 @@
 function slgrids_views_data()  {
 
   $data = array();
-  $data['slgrids']['table']['group']  = t('slgrids');
+  $data['sluser_grids']['table']['group']  = t('slgrids');
 
   // tables + fields that can be used for SQL Joins
-  $data['slgrids']['table']['join'] = array(
+  $data['sluser_grids']['table']['join'] = array(
     'node_revisions' => array(
       'left_field' => 'vid',
       'field' => 'vid',
@@ -16,18 +16,18 @@ function slgrids_views_data()  {
       'left_field' => 'vid',
       'field' => 'vid',
     ),
-    'sluser' => array(
+    /*'sluser' => array(
       'left_field' => 'grid_nid',
       'field' => 'nid',
     ),
     'sluser_terminals' => array(
       'left_field' => 'grid_nid',
       'field' => 'nid',
-    ),
+    ),*/
   );
 
 // login_uri
-  $data['slgrids']['login_uri'] = array(
+  $data['sluser_grids']['login_uri'] = array(
     'title' => t('login_uri'),
     'help' => t('login_uri.'),
 
@@ -46,7 +46,7 @@ function slgrids_views_data()  {
      ),
   );
 // xmlrpc_url
-  $data['slgrids']['xmlrpc_url'] = array(
+  $data['sluser_grids']['xmlrpc_url'] = array(
     'title' => t('xmlrpc_url'),
     'help' => t('xmlrpc_url.'),
 
@@ -65,7 +65,7 @@ function slgrids_views_data()  {
      ),
   );
 // httpIn_url
-  $data['slgrids']['httpIn_url'] = array(
+  $data['sluser_grids']['httpIn_url'] = array(
     'title' => t('httpIn_url'),
     'help' => t('httpIn_url.'),
 
@@ -90,7 +90,7 @@ function slgrids_views_data()  {
   //     by creating a new views type called 'Node example'
   //  This allows it to be selected as the 'view type'
   //          when you initially add a new view.
-  $data['slgrids']['table']['base'] = array(
+  $data['sluser_grids']['table']['base'] = array(
     'field' => 'vid',
     'title' => t('SlGrids'),
     'help' => t("slgrids informations."),
@@ -101,7 +101,7 @@ function slgrids_views_data()  {
   //   to access fields in other tables.
 
   // Relationship to the 'Node revision' table
-  $data['slgrids']['vid'] = array(
+  $data['sluser_grids']['vid'] = array(
     'title' => t('Node revision'),
     'help' => t('The particular node revision the color and quantity is attached to'),
     'relationship' => array(
@@ -115,7 +115,7 @@ function slgrids_views_data()  {
   );
 
   // Relationship to the 'Node' table
-  $data['slgrids']['nid'] = array(
+  $data['sluser_grids']['nid'] = array(
     'title' => t('Node'),
     'help' => t('The particular node the color and quantity is attached to'),
     'relationship' => array(
@@ -127,9 +127,9 @@ function slgrids_views_data()  {
       'skip base' => array('node', 'node_revisions'),
     ),
   );
-
+/*
   // Relationship to the 'SlUser' table
-  $data['slgrids']['nid'] = array(
+  $data['sluser_grids']['nid'] = array(
     'title' => t('SlUser'),
     'help' => t('The particular sluser the grid is attached to'),
     'relationship' => array(
@@ -140,10 +140,10 @@ function slgrids_views_data()  {
       // node so users won't create circular relationships.
       'skip base' => array('node', 'sluser'),
     ),
-  );
-
+  );*/
+/*
   // Relationship to the 'SlTerminals' table
-  $data['slgrids']['nid'] = array(
+  $data['sluser_grids']['nid'] = array(
     'title' => t('SlTerminals'),
     'help' => t('The particular terminal the grid is attached to'),
     'relationship' => array(
@@ -154,7 +154,7 @@ function slgrids_views_data()  {
       // node so users won't create circular relationships.
       'skip base' => array('node', 'sluser_terminals'),
     ),
-  );
+  );*/
 //  **** End optional extra for type and relationships
 
   return $data;
