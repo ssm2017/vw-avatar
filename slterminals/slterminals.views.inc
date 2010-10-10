@@ -16,6 +16,14 @@ function slterminals_views_data()  {
       'left_field' => 'vid',
       'field' => 'vid',
     ),
+    'sluser_grids' => array(
+      'left_field' => 'nid',
+      'field' => 'grid_nid',
+    ),
+    'sluser_user' => array(
+      'left_field' => 'nid',
+      'field' => 'grid_nid',
+    ),
   );
 // grid_nid
   $data['sluser_terminals']['grid_nid'] = array(
@@ -248,8 +256,8 @@ function slterminals_views_data()  {
       'skip base' => array('node', 'node_revisions'),
     ),
   );
-/*
-  // Relationship to the 'Node' table
+
+  // Relationship to the 'Grid' table
   $data['sluser_terminals']['grid_nid'] = array(
     'title' => t('Grid'),
     'help' => t('The particular node the grid is attached to'),
@@ -257,11 +265,8 @@ function slterminals_views_data()  {
       'label' => t('Grid'),
       'base' => 'node',
       'base field' => 'nid',
-      // This allows us to not show this relationship if the base is already
-      // node so users won't create circular relationships.
-      'skip base' => array('node', 'node_revisions'),
     ),
-  );*/
+  );
 //  **** End optional extra for type and relationships
 
   return $data;

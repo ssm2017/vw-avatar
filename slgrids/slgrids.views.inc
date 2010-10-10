@@ -16,14 +16,14 @@ function slgrids_views_data()  {
       'left_field' => 'vid',
       'field' => 'vid',
     ),
-    /*'sluser' => array(
+    'sluser' => array(
       'left_field' => 'grid_nid',
       'field' => 'nid',
     ),
     'sluser_terminals' => array(
       'left_field' => 'grid_nid',
       'field' => 'nid',
-    ),*/
+    ),
   );
 
 // login_uri
@@ -127,7 +127,7 @@ function slgrids_views_data()  {
       'skip base' => array('node', 'node_revisions'),
     ),
   );
-/*
+
   // Relationship to the 'SlUser' table
   $data['sluser_grids']['nid'] = array(
     'title' => t('SlUser'),
@@ -136,12 +136,9 @@ function slgrids_views_data()  {
       'label' => t('SlUser'),
       'base' => 'sluser',
       'base field' => 'grid_nid',
-      // This allows us to not show this relationship if the base is already
-      // node so users won't create circular relationships.
-      'skip base' => array('node', 'sluser'),
     ),
-  );*/
-/*
+  );
+
   // Relationship to the 'SlTerminals' table
   $data['sluser_grids']['nid'] = array(
     'title' => t('SlTerminals'),
@@ -150,11 +147,8 @@ function slgrids_views_data()  {
       'label' => t('SlTerminals'),
       'base' => 'sluser_terminals',
       'base field' => 'grid_nid',
-      // This allows us to not show this relationship if the base is already
-      // node so users won't create circular relationships.
-      'skip base' => array('node', 'sluser_terminals'),
     ),
-  );*/
+  );
 //  **** End optional extra for type and relationships
 
   return $data;
